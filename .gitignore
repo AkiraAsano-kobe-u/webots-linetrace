@@ -4,3 +4,5 @@ runs/stream.pid
 __pycache__/
 *.pyc
 .DS_Store
+# Webots rewrites its window layout here on every run
+.*.wbproj
