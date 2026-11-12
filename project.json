@@ -1,0 +1,14 @@
+{
+  "world": "examples/smoke/worlds/linetrace.wbt",
+  "controller": "examples/smoke/controllers/line_follower",
+  "sim_seconds": 60,
+  "wall_timeout_s": 180,
+  "trial_port": 1235,
+  "stream_port": 1234,
+  "stream_local_port": 1236,
+  "frozen": [
+    "examples/smoke/controllers/evaluator",
+    "examples/smoke/worlds",
+    "examples/smoke/textures"
+  ]
+}

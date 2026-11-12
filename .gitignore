@@ -1,0 +1,6 @@
+runs/last-trial.log
+runs/stream.log
+runs/stream.pid
+__pycache__/
+*.pyc
+.DS_Store

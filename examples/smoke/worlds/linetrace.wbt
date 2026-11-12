@@ -1,0 +1,46 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puckGroundSensors.proto"
+
+WorldInfo {
+  basicTimeStep 16
+}
+Viewpoint {
+  orientation -0.5773 0.5773 0.5773 2.0944
+  position 0 0 3.2
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  floorSize 2 2
+  floorTileSize 2 2
+  floorAppearance PBRAppearance {
+    baseColorMap ImageTexture {
+      url [
+        "../textures/track.png"
+      ]
+    }
+    roughness 1
+    metalness 0
+  }
+}
+DEF EPUCK E-puck {
+  translation 0.7 0 0
+  rotation 0 0 1 1.5708
+  controller "line_follower"
+  groundSensorsSlot [
+    E-puckGroundSensors {
+    }
+  ]
+}
+Robot {
+  name "evaluator"
+  controller "evaluator"
+  supervisor TRUE
+}

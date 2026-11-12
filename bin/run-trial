@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""Run one headless Webots trial and append the score to runs/results.jsonl.
+
+usage: bin/run-trial [--world PATH] [--sim-seconds N] [--timeout WALL_S] [--note TEXT] [--realtime]
+The world's evaluator controller must write JSON to $TRIAL_RESULT and quit Webots.
+"""
+import argparse, datetime, hashlib, json, os, pathlib, shutil, signal, subprocess, sys, tempfile
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+def find_webots():
+    """$WEBOTS_BIN, then the macOS app, then `webots` on PATH, then $WEBOTS_HOME."""
+    cands = [os.environ.get("WEBOTS_BIN"), "/Applications/Webots.app/Contents/MacOS/webots", shutil.which("webots")]
+    if os.environ.get("WEBOTS_HOME"):
+        cands.append(os.path.join(os.environ["WEBOTS_HOME"], "webots"))
+    for c in cands:
+        if c and os.path.isfile(c):
+            return c
+    sys.exit("Webots not found. Install Webots R2025a (https://cyberbotics.com) or set WEBOTS_BIN to the webots executable.")
+
+def git(*a):
+    return subprocess.run(["git", "-C", str(ROOT), *a], capture_output=True, text=True).stdout.strip()
+
+def main():
+    cfg = json.loads((ROOT / "project.json").read_text())
+    p = argparse.ArgumentParser()
+    p.add_argument("--world", default=cfg["world"])
+    p.add_argument("--sim-seconds", type=float, default=cfg.get("sim_seconds", 60))
+    p.add_argument("--timeout", type=float, default=cfg.get("wall_timeout_s", 180))
+    p.add_argument("--note", default="")
+    p.add_argument("--realtime", action="store_true", help="run in realtime instead of fast mode")
+    a = p.parse_args()
+
+    frozen = cfg.get("frozen", [])
+    if frozen and git("status", "--porcelain", "--", *frozen):
+        sys.exit("refusing to run: frozen files changed (evaluator/world must match HEAD): " + ", ".join(frozen))
+
+    world = (ROOT / a.world).resolve()
+    fd, result_path = tempfile.mkstemp(suffix=".json"); os.close(fd); os.unlink(result_path)
+    env = dict(os.environ, TRIAL_RESULT=result_path, TRIAL_SIM_SECONDS=str(a.sim_seconds))
+    port = str(cfg.get("trial_port", 1235))  # 1234 is left for bin/stream
+    cmd = [find_webots(), "--batch", "--minimize", "--stdout", "--stderr", f"--port={port}"]
+    # --no-rendering segfaults Webots R2025a on Apple Silicon; --minimize alone is stable.
+    cmd += ["--mode=realtime"] if a.realtime else ["--mode=fast"]
+    cmd.append(str(world))
+
+    # After a killed/crashed run macOS shows a modal "reopen windows?" alert that blocks startup forever (no-op elsewhere).
+    shutil.rmtree(pathlib.Path.home() / "Library/Saved Application State/com.cyberbotics.webots.savedState", ignore_errors=True)
+
+    log = ROOT / "runs" / "last-trial.log"
+    log.parent.mkdir(exist_ok=True)
+    status = "ok"
+    with open(log, "w") as lf:
+        proc = subprocess.Popen(cmd, env=env, stdout=lf, stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            proc.wait(timeout=a.timeout)
+        except subprocess.TimeoutExpired:
+            status = "wall_timeout"
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait()
+
+    result = None
+    if os.path.exists(result_path):
+        result = json.loads(pathlib.Path(result_path).read_text()); os.unlink(result_path)
+    elif status == "ok":
+        status = "no_result"
+
+    target = ROOT / cfg["controller"]
+    files = sorted(f for f in target.rglob("*") if f.is_file() and "__pycache__" not in f.parts) if target.is_dir() else [target]
+    h = hashlib.sha1()
+    for f in files:
+        h.update(f.read_bytes())
+    rec = {
+        "at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "status": status,
+        "result": result,
+        "commit": git("rev-parse", "--short", "HEAD"),
+        "dirty": bool(git("status", "--porcelain", "--", cfg["controller"])),
+        "controller_sha1": h.hexdigest()[:12],
+        "world": a.world,
+        "sim_seconds": a.sim_seconds,
+        "note": a.note,
+    }
+    with open(ROOT / "runs" / "results.jsonl", "a") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    print(json.dumps(rec, ensure_ascii=False))
+    sys.exit(0 if status == "ok" else 1)
+
+if __name__ == "__main__":
+    main()
