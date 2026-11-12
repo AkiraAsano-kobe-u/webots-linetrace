@@ -8,12 +8,14 @@ jobs:
     runs-on: ubuntu-latest
     container: cyberbotics/webots:R2025a-ubuntu22.04
     steps:
-      - run: apt-get update && apt-get install -y --no-install-recommends git xvfb python3
+      - run: apt-get update && apt-get install -y --no-install-recommends git xvfb python3 ca-certificates
       - uses: actions/checkout@v4
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      # Per-file asset downloads from raw.githubusercontent.com are throttled on shared runners.
+      - run: bin/fetch-assets
       - name: Run one trial
-        run: xvfb-run -a bin/run-trial --timeout 900 --note "CI" | tee trial.json
+        run: xvfb-run -a bin/run-trial --timeout 300 --note "CI" | tee trial.json
       - name: Robot must have moved along the line
         run: python3 -c "import json;r=json.load(open('trial.json'));print(r);assert r['status']=='ok' and r['result']['score']>0.5"
       - if: always()
-        run: tail -50 runs/last-trial.log || true
+        run: grep -v "Cannot download" runs/last-trial.log | tail -40 || true

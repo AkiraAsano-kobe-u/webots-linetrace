@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+"""Pre-fill the Webots asset cache from the official assets-R2025a.zip (about 700 MB).
+
+Optional. Webots downloads robot models and textures one by one on first use; when those downloads fail or stall
+(the trial ends with status "wall_timeout" and runs/last-trial.log is full of "Cannot download"), run this once.
+"""
+import os, pathlib, sys, tempfile, urllib.request, zipfile
+
+URL = "https://github.com/cyberbotics/webots/releases/download/R2025a/assets-R2025a.zip"
+home = pathlib.Path.home()
+if sys.platform == "darwin":
+    cache = home / "Library/Caches/Cyberbotics/Webots/assets"
+elif sys.platform.startswith("linux"):
+    cache = pathlib.Path(os.environ.get("XDG_CACHE_HOME", home / ".cache")) / "Cyberbotics/Webots/assets"
+else:
+    sys.exit("unsupported platform: unpack " + URL + " into the Webots asset cache by hand")
+
+cache.mkdir(parents=True, exist_ok=True)
+with tempfile.TemporaryDirectory() as tmp:
+    zpath = pathlib.Path(tmp) / "assets.zip"
+    print("downloading", URL, flush=True)
+    urllib.request.urlretrieve(URL, zpath)
+    n = 0
+    with zipfile.ZipFile(zpath) as z:
+        for info in z.infolist():
+            if info.is_dir():
+                continue
+            (cache / pathlib.PurePosixPath(info.filename).name).write_bytes(z.read(info))   # the cache is flat
+            n += 1
+print(f"{n} files -> {cache}")

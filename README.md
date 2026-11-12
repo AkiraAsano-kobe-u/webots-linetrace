@@ -16,6 +16,8 @@ bin/run-trial --note baseline
 ```
 
 The first run downloads the robot models referenced by the world, so it needs internet access and takes longer.
+If it ends with `"status": "wall_timeout"` and `runs/last-trial.log` is full of `Cannot download`, run `bin/fetch-assets`
+once: it fills the Webots asset cache from the official `assets-R2025a.zip` (about 700 MB).
 After that a trial takes about 5 seconds and prints one JSON line:
 
 ```json
@@ -40,6 +42,7 @@ Scores are deterministic on one machine; they can differ between platforms, so t
 | Command | What |
 |---|---|
 | `bin/run-trial [--note TEXT]` | one trial in fast mode; the result is printed and appended to `runs/results.jsonl` |
+| `bin/fetch-assets` | optional: pre-fill the Webots asset cache (see Quick start) |
 | `bin/stream start\|stop\|status` | live view of the current controller in a browser (realtime, Webots w3d stream) |
 
 `bin/stream start` prints a local URL (`http://127.0.0.1:1236/index.html`). Open it and press Connect.
